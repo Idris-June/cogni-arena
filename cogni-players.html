@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join · E-Invoicing Game Arena</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{--navy:#002285;--blue:#1430FF;--coral:#FF6B4A;--tint:#EEF1FF;--ink:#1A1F36;--quiet:#5B6178;--good:#1F8A4C;--bad:#C0392B;--k0:#E21B3C;--k1:#1368CE;--k2:#D89E00;--k3:#26890C}
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Inter,Arial,sans-serif;color:var(--ink);background:#f4f6fb;min-height:100vh}
+header{background:var(--navy);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.brand{font-weight:800;font-size:18px;background:#fff;color:var(--navy);padding:4px 10px;border-radius:8px}.brand span{color:var(--blue)}
+.hname{font-weight:700;font-size:15px}@media(max-width:520px){.hname{display:none}}
+.me{margin-left:auto;font-weight:700;font-size:14px;text-align:right}
+main{max-width:720px;margin:0 auto;padding:16px}
+.card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:14px}
+h2{color:var(--navy);margin:0 0 8px;font-size:22px}h3{color:var(--navy);margin:14px 0 6px;font-size:16px}
+.sub{color:var(--quiet);font-size:14px;margin:0 0 10px}
+button{font-family:inherit;font-weight:700;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;font-size:16px}
+button:disabled{opacity:.5;cursor:default}
+.primary{background:var(--blue);color:#fff}.ghost{background:var(--tint);color:var(--navy)}.coral{background:var(--coral);color:#fff}
+input,select,textarea{font-family:inherit;font-size:16px;padding:12px;border:1px solid #d5daea;border-radius:10px;width:100%}
+textarea{min-height:140px}
+.field{margin-bottom:12px}
+.q{font-size:20px;font-weight:800;color:var(--navy);line-height:1.35;margin:4px 0 14px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:480px){.opts{grid-template-columns:1fr}}
+.opt{color:#fff;padding:20px 14px;border-radius:12px;font-size:17px;text-align:left;min-height:80px}
+.c0{background:var(--k0)}.c1{background:var(--k1)}.c2{background:var(--k2)}.c3{background:var(--k3)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--tint);color:var(--navy);font-size:12px;font-weight:700}
+.timer{font-size:26px;font-weight:800;color:var(--coral);font-variant-numeric:tabular-nums;margin-left:auto}
+.center{text-align:center}
+.big{font-size:48px;font-weight:900}
+.ok{background:#e9f6ee;color:var(--good)}.no{background:#fdecea;color:var(--bad)}
+.result{border-radius:14px;padding:22px;text-align:center}
+.gridrow{border:1px solid #e3e6ef;border-radius:10px;padding:10px;margin-bottom:8px}
+.gridrow b{display:block;margin-bottom:6px}
+.line{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;cursor:pointer}
+.code{font-family:Consolas,monospace;font-size:13px;background:#0f1636;color:#e6ebff;padding:8px 10px;border-radius:6px;white-space:pre-wrap;word-break:break-all;flex:1}
+.line input{width:22px;height:22px;margin-top:6px;flex:none}
+.bingo{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.bcell{background:var(--tint);color:var(--navy);padding:14px 4px;border-radius:10px;font-size:14px;min-height:64px}
+.bcell.on{background:var(--blue);color:#fff}
+.team{display:flex;justify-content:space-between;align-items:center;border:1px solid #e3e6ef;border-radius:10px;padding:10px;margin-bottom:8px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:12px;font-weight:700;max-width:90%;z-index:9}
+.toast.good{background:var(--good)}
+.hidden{display:none}
+.jb{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}.jh{background:var(--navy);color:#fff;text-align:center;font-weight:800;padding:8px 2px;border-radius:6px;font-size:11px}
+</style>
+</head>
+<body>
+<header><div class="brand">E-Invoicing<span> Game Arena</span></div><div class="me" id="me"></div></header>
+<main id="app"></main>
+<div class="toast hidden" id="toast"></div>
+<script>
+const ICE=[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:global.stun.twilio.com:3478"},
+  {urls:"turn:openrelay.metered.ca:80",username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443",username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443?transport=tcp",username:"openrelayproject",credential:"openrelayproject"}];
+const QS=new URLSearchParams(location.search);
+const LOCAL=QS.has("local");
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const L=i=>String.fromCharCode(65+i);
+function fmt(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function ss(k,v){try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(_){return null}}
+let pid=ss("cogni-pid");if(!pid){pid="p"+Math.random().toString(36).slice(2)+Date.now().toString(36);ss("cogni-pid",pid)}
+let ST=null, link=null, deadline=null, viewKey="", myName=ss("cogni-name")||"", myPin=QS.get("pin")||ss("cogni-pin")||"";
+let marks=new Set(), retry=0, joined=false, changing=false;
+
+function connect(pin,name){
+  const onData=d=>{if(!d)return;if(d.t==="state"){ST=d;deadline=d.endsIn!=null?Date.now()+d.endsIn:null;joined=true;retry=0;render()}
+    else if(d.t==="toast")toast(d.msg,d.good);else if(d.t==="ended"){ST=null;joined=false;link=null;app(`<div class="card center"><h2>Session ended</h2><p class="sub">Thanks for playing!</p></div>`)}};
+  const hello=()=>link.send({t:"hello",pid,name});
+  if(LOCAL){const cid="c"+Math.random().toString(36).slice(2);const bc=new BroadcastChannel("cogni-"+pin);
+    bc.onmessage=e=>{const d=e.data;if(d&&d.to===cid)onData(d.data)};
+    link={send:data=>bc.postMessage({to:"host",from:cid,data})};
+    window.addEventListener("beforeunload",()=>bc.postMessage({to:"host",from:cid,type:"bye"}));
+    hello();setTimeout(()=>{if(!joined)fail("No game found with that PIN.")},3000);return}
+  if(typeof Peer==="undefined"){fail("The game connection didn't load. Check your internet and reload the page.");return}
+  const peer=new Peer({config:{iceServers:ICE}});let conn=null;
+  if(!joined)setTimeout(()=>{if(!joined&&link&&link._peer===peer){try{peer.destroy()}catch(_){}fail("Couldn't reach game "+pin+". Check the PIN on the screen. If it's right, your network may be blocking the game. Try mobile data.")}},12000);
+  link={_peer:peer,send:d=>{if(conn&&conn.open){try{conn.send(d)}catch(_){}}}};
+  peer.on("open",()=>{conn=peer.connect("cogni-arena-"+pin,{reliable:true});
+    conn.on("open",hello);conn.on("data",onData);
+    conn.on("close",()=>{if(!joined)return;reconnect(pin,name,peer)});conn.on("error",()=>{})});
+  peer.on("error",e=>{if(e.type==="peer-unavailable"){if(joined)reconnect(pin,name,peer);else fail("No game found with that PIN. Check the number on the screen.")}
+    else if(e.type==="network"||e.type==="server-error"||e.type==="socket-error")reconnect(pin,name,peer);
+    else fail("Connection problem ("+e.type+"). Try reloading the page.")});
+}
+function reconnect(pin,name,peer){if(retry>8){fail("Lost the connection to the host. Reload to rejoin with the same name.");return}
+  retry++;banner("Reconnecting…");try{peer&&peer.destroy()}catch(_){}setTimeout(()=>connect(pin,name),1500*retry)}
+function fail(msg){joined=false;link=null;renderJoin(msg)}
+function banner(t){$("#me").textContent=t}
+function toast(msg,good){const t=$("#toast");t.textContent=msg;t.className="toast"+(good?" good":"");clearTimeout(t._h);t._h=setTimeout(()=>t.className="toast hidden",3500)}
+function app(h){$("#app").innerHTML=h}
+function send(m){if(link)link.send(m)}
+
+function renderJoin(err){
+  viewKey="";
+  app(`<div class="card"><h2>Join the game</h2><p class="sub">Enter the PIN shown on the presenter screen and your name. Please use the same name every day.</p>
+  <div class="field"><input id="pin" inputmode="numeric" maxlength="6" placeholder="Game PIN" value="${esc(myPin)}"></div>
+  <div class="field"><input id="nm" maxlength="24" placeholder="Your name" value="${esc(myName)}"></div>
+  <button class="primary" id="join" style="width:100%">Enter</button>
+  <p class="sub" style="color:var(--bad);margin-top:10px">${esc(err||"")}</p></div>`);
+  const go=()=>{const p=$("#pin").value.replace(/\D/g,""),n=$("#nm").value.trim();if(p.length!==6){$("#pin").focus();return}if(!n){$("#nm").focus();return}
+    myPin=p;myName=n;ss("cogni-pin",p);ss("cogni-name",n);app(`<div class="card center"><h2>Joining…</h2><p class="sub">Connecting to game ${esc(p)}</p></div>`);connect(p,n)};
+  $("#join").onclick=go;$("#nm").onkeydown=e=>{if(e.key==="Enter")go()};
+  (myPin?$("#nm"):$("#pin")).focus();
+}
+
+function headerInfo(){if(!ST)return;const m=ST.me;banner(`${m.name}${m.team?" · "+m.team:""} · ${ST.game&&ST.game.team?(m.teamScore||0):m.score} pts${m.rank?" · #"+m.rank:""}`)}
+function keyOf(){const s=ST,r=s.round||{};return [s.phase,s.game?.id,s.ri,s.rk,r.k,r.clue,s.answered?1:0,s.needTeam?1:0,s.result?(s.result.pts+"/"+s.result.detail):0].join("|")}
+
+function render(){
+  if(!ST)return;headerInfo();
+  if(changing){if(ST.phase==="gamelobby"&&ST.me.teamId){live();return}changing=false;viewKey=""}
+  const k=keyOf();
+  if(k===viewKey){live();return}
+  viewKey=k;const s=ST,r=s.round;
+  if(s.needTeam){renderTeam();return}
+  if(!s.game||s.phase==="lobby"){app(`<div class="card center"><h2>You're in, ${esc(s.me.name)}!</h2><p class="sub">See your name on the screen? The host will start the game soon.</p>${s.day?`<span class="pill">${esc(s.day)}</span>`:""}</div>`);return}
+  if(s.phase==="gamelobby"){app(`<div class="card"><span class="pill">${esc(s.game.mod)} · ${esc(s.game.id)}</span><h2 style="margin-top:8px">${esc(s.game.name)}</h2><p>${esc(s.game.intro)}</p>
+    ${s.game.team?`<p class="sub">Your team: <b>${esc(s.me.team||"")}</b> <button class="ghost" id="chg" style="padding:6px 10px;font-size:13px">Change team</button></p>`:""}<p class="sub">Get ready…</p></div>`);
+    const c=$("#chg");if(c)c.onclick=()=>{changing=true;renderTeam(true)};return}
+  if(s.phase==="leader"){app(`<div class="card center"><h2>Leaderboard</h2><div class="big">#${s.me.rank||"–"}</div><p class="sub">of ${s.me.of} · ${s.game.team?(s.me.teamScore||0):s.me.score} points</p><p class="sub">Look at the presenter screen!</p></div>`);return}
+  if(s.phase==="final"){app(`<div class="card center"><h2>Game over</h2><div class="big">#${s.me.rank||"–"}</div><p class="sub">${s.game.team?"Your team":"You"} finished with ${s.game.team?(s.me.teamScore||0):s.me.score} points</p></div>`);return}
+  if(s.phase==="reveal"){const res=s.result||{};
+    app(`<div class="card"><div class="result ${(res.ok||res.pts>0)&&!res.none?"ok":"no"}"><div class="big">${res.none?"No answer":res.pts>0?"+"+res.pts:res.ok?"✔":"✘"}</div>
+    <p style="font-weight:700">${res.none?"Time ran out.":esc(res.detail||(res.ok?"Correct!":"Not this time"))}</p></div>
+    ${s.key?`<h3>Answer</h3><p>${esc(s.key)}</p>`:""}${s.why?`<p class="sub">${esc(s.why)}</p>`:""}</div>`);return}
+  if(s.phase==="pick"){app(`<div class="card center"><h2>${esc(s.game.name)}</h2><p class="sub">The host is picking the next clue. Get your fingers ready!</p></div>`);return}
+  if(!r){app(`<div class="card center"><p class="sub">Waiting for the host…</p></div>`);return}
+  const top=`<div class="row"><span class="pill">${esc(s.game.name)} · ${s.ri+1}/${s.rn}</span><span class="timer" id="tl"></span></div>`;
+  if(s.phase==="info"){app(`<div class="card">${top}<div class="q">${esc(r.q)}</div><p>${esc(r.body)}</p><p class="sub">Listen to the host.</p></div>`);return}
+  if(s.phase==="bingo"){renderBingo(r);return}
+  if(s.answered){app(`<div class="card center">${top}<h2>Answer locked in ✔</h2><p class="sub">${s.game.team&&s.answeredBy?"Your team answered (by "+esc(s.answeredBy)+")":"Waiting for the others…"}</p></div>`);live();return}
+  let h=`<div class="card">${top}`;
+  if(r.k==="board")h+=`<span class="pill">${esc(r.cat)} · ${r.value}</span><div class="q">${esc(r.clue)}</div><div class="field"><input id="tx" placeholder="Your answer" maxlength="120"></div><button class="primary" id="sub" style="width:100%">Submit (first correct wins)</button>`;
+  else h+=`<div class="q">${esc(r.q)}</div>`;
+  if(r.k==="mcq")h+=`<div class="opts">${r.opts.map((o,i)=>`<button class="opt c${i%4}" data-o="${i}">${L(i)}. ${esc(o)}</button>`).join("")}</div>`;
+  if(r.k==="exact")h+=`<div class="field"><input id="tx" placeholder="Type the exact value" maxlength="60" autocomplete="off"></div><button class="primary" id="sub" style="width:100%">Submit</button>`;
+  if(r.k==="text")h+=`<div class="field"><textarea id="tx" maxlength="1200" placeholder="Write your answer"></textarea></div><button class="primary" id="sub" style="width:100%">Submit</button>`;
+  if(r.k==="grid")h+=r.rows.map((lab,i)=>`<div class="gridrow"><b>${i+1}. ${esc(lab)}</b>${r.cols.map((c,j)=>`<select data-gi="${i}" data-gj="${j}"><option value="">${esc(c.name)}…</option>${c.opts.map((o,k)=>`<option value="${k}">${esc(o)}</option>`).join("")}</select>`).join("")}</div>`).join("")+`<button class="primary" id="sub" style="width:100%">Submit all</button><p class="sub" id="gmsg"></p>`;
+  if(r.k==="lines")h+=r.lines.map((l,i)=>`<label class="line"><input type="checkbox" data-li="${i}"><span class="code">${i+1}. ${esc(l)}</span></label>`).join("")+`<p class="sub">Tick every line with a bug. Wrong ticks cost points.</p><button class="primary" id="sub" style="width:100%">Submit</button>`;
+  if(r.k==="vote")h+=(r.teams.length?r.teams.map(t=>`<button class="ghost" data-v="${esc(t.id)}" style="width:100%;margin-bottom:8px">${esc(t.name)}</button>`).join(""):'<p class="sub">No other teams to vote for.</p>');
+  h+="</div>";app(h);live();
+  const answer=val=>send({t:"ans",rk:s.rk,val});
+  document.querySelectorAll("[data-o]").forEach(b=>b.onclick=()=>answer(+b.dataset.o));
+  document.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>answer(b.dataset.v));
+  const sb=$("#sub");if(sb)sb.onclick=()=>{
+    if(r.k==="grid"){const val=r.rows.map(()=>r.cols.map(()=>null));let miss=0;document.querySelectorAll("[data-gi]").forEach(el=>{const v=el.value;if(v==="")miss++;val[+el.dataset.gi][+el.dataset.gj]=v===""?null:+v});
+      if(miss&&!sb.dataset.c){sb.dataset.c="1";$("#gmsg").textContent=miss+" left blank. Tap Submit again to send anyway.";return}answer(val);return}
+    if(r.k==="lines"){answer([...document.querySelectorAll("[data-li]:checked")].map(e=>+e.dataset.li));return}
+    const v=$("#tx").value.trim();if(!v){$("#tx").focus();return}answer(v)};
+  const tx=$("#tx");if(tx&&r.k!=="text"){tx.focus();tx.onkeydown=e=>{if(e.key==="Enter")sb.click()}}
+}
+function live(){if(!ST)return;const t=$("#tl");if(t&&deadline){const l=Math.max(0,Math.ceil((deadline-Date.now())/1000));t.textContent=l?fmt(l):"TIME'S UP"}
+  if(ST.phase==="bingo"){const d=$("#def");if(d)d.textContent=ST.round&&ST.round.def?ST.round.def:"Waiting for the first definition…";const n=$("#ncl");if(n)n.textContent=(ST.round?ST.round.ncalled:0)+" called"}
+  if(ST.needTeam||$("#tlist"))teamsList()}
+function renderBingo(r){
+  app(`<div class="card"><div class="row"><span class="pill">E-Invoicing Bingo</span><span class="sub" id="ncl" style="margin:0 0 0 auto"></span></div>
+  <h3>Definition</h3><div class="q" id="def"></div>
+  <div class="bingo">${r.card.map((t,i)=>`<button class="bcell ${marks.has(t)?"on":""}" data-b="${i}">${esc(t)}</button>`).join("")}</div>
+  <button class="coral" id="bingo" style="width:100%;margin-top:12px">BINGO!</button><p class="sub" style="margin-top:8px">Tap a term when its definition is called. Complete a row, column or diagonal.</p></div>`);
+  document.querySelectorAll("[data-b]").forEach(b=>b.onclick=()=>{const t=r.card[+b.dataset.b];marks.has(t)?marks.delete(t):marks.add(t);b.classList.toggle("on")});
+  $("#bingo").onclick=()=>send({t:"bingo",marks:[...marks]});live();
+}
+function renderTeam(change){
+  app(`<div class="card"><h2>${esc(ST.game?ST.game.name:"Team game")}</h2><p class="sub">This is a team game. Join a team or create one.</p>
+  <h3>Join a team</h3><div id="tlist"></div>
+  <h3>Create a team</h3><div class="field"><input id="tn" maxlength="30" placeholder="Team name"></div>
+  <div class="field"><input id="tm" maxlength="200" placeholder="Teammates (names, separated by commas)"></div>
+  <button class="primary" id="mk" style="width:100%">Create team</button>${change?'<button class="ghost" id="back" style="width:100%;margin-top:8px">Keep my team</button>':""}</div>`);
+  teamsList();
+  $("#mk").onclick=()=>{const n=$("#tn").value.trim();if(!n){$("#tn").focus();return}send({t:"team",action:"create",name:n,mates:$("#tm").value});changing=false;viewKey=""};
+  const b=$("#back");if(b)b.onclick=()=>{changing=false;viewKey="";render()};
+}
+function teamsList(){const el=$("#tlist");if(!el||!ST)return;const ts=ST.teams||[];
+  const html=ts.length?ts.map(t=>`<div class="team"><div><b>${esc(t.name)}</b><br><span class="sub" style="margin:0">${esc([...t.members,...t.mates.filter(m=>!t.members.includes(m))].join(", "))}</span></div><button class="ghost" data-tj="${esc(t.id)}" style="padding:8px 12px">${ST.me.teamId===t.id?"Joined ✔":"Join"}</button></div>`).join(""):'<p class="sub">No teams yet. Create the first one!</p>';
+  if(el._h!==html){el.innerHTML=html;el._h=html;el.querySelectorAll("[data-tj]").forEach(b=>b.onclick=()=>{send({t:"team",action:"join",tid:b.dataset.tj});changing=false;viewKey=""})}}
+setInterval(live,250);
+renderJoin();
+</script>
+</body>
+</html>
